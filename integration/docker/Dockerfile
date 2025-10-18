@@ -1,12 +1,12 @@
 # Production Docker Image for Axolotl USF Integration Layer
-# Based on Axolotl's Dockerfile-base pattern with CUDA 12.4
+# Based on Axolotl's Dockerfile-base-next pattern (Python 3.11 + CUDA 12.8.1)
 #
 # Usage:
 #   docker build -f integration/docker/Dockerfile -t axolotl-usf:latest .
 #   docker run --gpus all -v $(pwd)/job_config.yaml:/workspace/job_config.yaml axolotl-usf:latest
 
-# Use Axolotl's exact proven CUDA version from docker/Dockerfile-base
-ARG CUDA_VERSION="11.8.0"
+# Use CUDA 12.8.1 (matches Axolotl's docker/Dockerfile-base-next for Python 3.11)
+ARG CUDA_VERSION="12.8.1"
 ARG CUDNN_VERSION="8"
 ARG UBUNTU_VERSION="22.04"
 
@@ -21,32 +21,23 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV PATH="/root/miniconda3/bin:${PATH}"
 
-# Build arguments (matching Axolotl's docker/Dockerfile-base exactly)
+# Build arguments (matching Axolotl's docker/Dockerfile-base-next for Python 3.11)
 ARG PYTHON_VERSION="3.11"
-ARG PYTORCH_VERSION="2.1.2"
-ARG CUDA="118"
+ARG PYTORCH_VERSION="2.7.1"
+ARG CUDA="128"
 ARG TORCH_CUDA_ARCH_LIST="7.0 7.5 8.0 8.6 9.0+PTX"
 
 ENV PYTHON_VERSION=$PYTHON_VERSION
 ENV TORCH_CUDA_ARCH_LIST=$TORCH_CUDA_ARCH_LIST
 
-# Install system dependencies (following Axolotl's docker/Dockerfile-base pattern)
+# Install system dependencies and Miniconda (EXACTLY like Axolotl's Dockerfile-base-next)
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends --allow-change-held-packages \
-        wget git build-essential ninja-build git-lfs libaio-dev pkg-config \
-        ibverbs-providers ibverbs-utils infiniband-diags \
-        librdmacm-dev librdmacm1 rdmacm-utils \
-        vim curl nano libnccl2 libnccl-dev rsync \
-    && rm -rf /var/cache/apt/archives \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Miniconda (exactly like Axolotl does)
-RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh \
+    && apt-get install -y wget git build-essential ninja-build git-lfs libaio-dev pkg-config && rm -rf /var/lib/apt/lists/* \
+    && wget \
+    https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh \
     && mkdir /root/.conda \
     && bash Miniconda3-latest-Linux-x86_64.sh -b \
     && rm -f Miniconda3-latest-Linux-x86_64.sh \
-    && conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main \
-    && conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r \
     && conda create -n "py${PYTHON_VERSION}" python="${PYTHON_VERSION}"
 
 # Activate conda environment
@@ -54,22 +45,19 @@ ENV PATH="/root/miniconda3/envs/py${PYTHON_VERSION}/bin:${PATH}"
 
 WORKDIR /workspace
 
-# Install PyTorch and dependencies (EXACTLY like Axolotl's docker/Dockerfile-base)
-RUN python3 -m pip install --upgrade pip && \
-    pip3 install -U packaging==23.2 setuptools==75.8.0 wheel && \
-    python3 -m pip install --no-cache-dir -U torch==${PYTORCH_VERSION}+cu${CUDA} torchvision --extra-index-url https://download.pytorch.org/whl/cu$CUDA && \
-    CAUSAL_CONV1D_FORCE_CXX11_ABI=TRUE CAUSAL_CONV1D_FORCE_BUILD=TRUE python3 -m pip install --no-cache-dir causal_conv1d==1.5.2 && \
-    python3 -m pip install --no-cache-dir "mamba_ssm @ git+https://github.com/state-spaces/mamba.git@main" && \
-    python3 -m pip cache purge
+# Install PyTorch and dependencies (EXACTLY like Axolotl's Dockerfile-base-next)
+RUN python3 -m pip install --upgrade pip && pip3 install packaging && \
+    python3 -m pip install --no-cache-dir -U torch==${PYTORCH_VERSION} --extra-index-url https://download.pytorch.org/whl/test/cu$CUDA && \
+    python3 -m pip install --no-cache-dir "causal_conv1d @ git+https://github.com/Dao-AILab/causal-conv1d.git@main" && \
+    python3 -m pip install --no-cache-dir "mamba_ssm @ git+https://github.com/state-spaces/mamba.git@main"
 
-# Install git-lfs, awscli, and pydantic (EXACTLY like Axolotl's docker/Dockerfile-base)
+# Install git-lfs, awscli, and pydantic (EXACTLY like Axolotl's Dockerfile-base-next)
 RUN git lfs install --skip-repo && \
     pip3 install awscli && \
-    pip3 install -U --no-cache-dir pydantic==1.10.10 && \
-    pip3 cache purge
+    pip3 install -U --no-cache-dir pydantic==2.10.6
 
-# Install Flash Attention (conditional, like Axolotl)
-RUN pip3 install --no-build-isolation flash-attn==2.6.3
+# Install Flash Attention for CUDA 12.8
+RUN pip3 install --no-build-isolation flash-attn
 
 # Copy Axolotl source code from repository
 COPY . /workspace/axolotl-usf
