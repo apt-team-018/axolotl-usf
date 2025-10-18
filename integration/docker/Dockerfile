@@ -5,11 +5,8 @@
 #   docker build -f integration/docker/Dockerfile -t axolotl-usf:latest .
 #   docker run --gpus all -v $(pwd)/job_config.yaml:/workspace/job_config.yaml axolotl-usf:latest
 
-ARG CUDA_VERSION=12.4.0
-ARG CUDNN_VERSION=8
-ARG UBUNTU_VERSION=22.04
-
-FROM nvidia/cuda:${CUDA_VERSION}-cudnn${CUDNN_VERSION}-devel-ubuntu${UBUNTU_VERSION}
+# Use NVIDIA CUDA base image (verified to exist)
+FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04
 
 LABEL maintainer="Axolotl USF Team"
 LABEL description="Production-ready automated fine-tuning with Axolotl"
@@ -21,15 +18,23 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV CUDA_HOME=/usr/local/cuda
 ENV PATH="/root/miniconda3/bin:${PATH}"
 
-# Install system dependencies
+# Install system dependencies including Python 3.11
 RUN apt-get update && apt-get install -y \
-    python3.11 python3.11-dev python3-pip python3.11-venv \
+    software-properties-common \
+    && add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y \
+    python3.11 python3.11-dev python3.11-distutils \
     git wget curl vim nano \
     build-essential ninja-build \
     libaio-dev pkg-config \
     infiniband-diags ibverbs-providers ibverbs-utils \
     librdmacm-dev librdmacm1 rdmacm-utils \
     && rm -rf /var/lib/apt/lists/*
+
+# Install pip for Python 3.11
+RUN wget https://bootstrap.pypa.io/get-pip.py && \
+    python3.11 get-pip.py && \
+    rm get-pip.py
 
 # Set Python 3.11 as default
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
@@ -38,10 +43,10 @@ RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 # Upgrade pip
 RUN python3 -m pip install --upgrade pip setuptools wheel
 
-# Install PyTorch with CUDA support (CUDA 12.4)
+# Install PyTorch with CUDA 12.1 support (compatible with CUDA 11.8 base + newer drivers)
 RUN pip3 install --no-cache-dir \
     torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 \
-    --index-url https://download.pytorch.org/whl/cu124
+    --index-url https://download.pytorch.org/whl/cu121
 
 # Install Flash Attention
 RUN pip3 install --no-cache-dir flash-attn==2.6.3 --no-build-isolation
