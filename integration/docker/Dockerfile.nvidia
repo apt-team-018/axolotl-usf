@@ -1,0 +1,86 @@
+# NVIDIA GPU Docker Image for Automated Fine-Tuning
+ARG CUDA_VERSION=12.4.0
+ARG CUDNN_VERSION=9
+ARG UBUNTU_VERSION=22.04
+
+FROM nvidia/cuda:${CUDA_VERSION}-cudnn${CUDNN_VERSION}-devel-ubuntu${UBUNTU_VERSION}
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV CUDA_HOME=/usr/local/cuda
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    python3.11 python3.11-dev python3-pip python3.11-venv \
+    git wget curl vim nano \
+    build-essential ninja-build \
+    libaio-dev pkg-config \
+    infiniband-diags ibverbs-providers ibverbs-utils \
+    librdmacm-dev librdmacm1 rdmacm-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Python 3.11 as default
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
+    update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
+
+# Upgrade pip
+RUN python3 -m pip install --upgrade pip setuptools wheel
+
+# Install PyTorch with CUDA support
+RUN pip3 install --no-cache-dir \
+    torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 \
+    --index-url https://download.pytorch.org/whl/cu124
+
+# Install Flash Attention
+RUN pip3 install --no-cache-dir flash-attn==2.6.3 --no-build-isolation
+
+# Set working directory
+WORKDIR /workspace
+
+# Copy Axolotl source (assumes we're building from axolotl repo root)
+COPY . /workspace/axolotl
+
+# Install Axolotl with all dependencies
+WORKDIR /workspace/axolotl
+RUN pip3 install --no-cache-dir -e .[deepspeed,flash-attn,optimizers]
+
+# Install integration layer
+COPY integration/ /workspace/integration/
+RUN pip3 install --no-cache-dir pyyaml
+
+# Install cloud storage clients
+RUN pip3 install --no-cache-dir \
+    boto3 \
+    azure-storage-blob \
+    google-cloud-storage \
+    huggingface_hub[cli]
+
+# Install monitoring tools
+RUN pip3 install --no-cache-dir \
+    pymongo \
+    wandb \
+    mlflow \
+    tensorboard
+
+# Install API dependencies
+RUN pip3 install --no-cache-dir \
+    fastapi \
+    uvicorn[standard] \
+    pydantic
+
+# Create workspace directories
+RUN mkdir -p /workspace/data /workspace/output /workspace/checkpoints
+
+# Set working directory
+WORKDIR /workspace
+
+# Copy entrypoint script
+COPY integration/docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Set entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
+
+# Default command
+CMD ["python3", "/workspace/integration/train_wrapper.py", "--job-config", "/workspace/job_config.yaml"]

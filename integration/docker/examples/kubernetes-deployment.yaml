@@ -1,0 +1,222 @@
+# Kubernetes Deployment for Axolotl USF
+# Single-node GPU training example
+#
+# Prerequisites:
+# - Kubernetes cluster with GPU nodes
+# - NVIDIA GPU Operator installed
+# - PersistentVolume for data/output
+#
+# Deploy:
+#   kubectl apply -f kubernetes-deployment.yaml
+#
+# Monitor:
+#   kubectl logs -f deployment/axolotl-usf-training
+#   kubectl get pods -l app=axolotl-usf
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: axolotl-usf
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: axolotl-usf-config
+  namespace: axolotl-usf
+data:
+  job_config.yaml: |
+    job_id: "k8s-training-job-001"
+    model: "meta-llama/Llama-3.1-8B"
+    training_type: "qlora"
+
+    nodes: 1
+    gpus_per_node: 1
+
+    storage:
+      type: "s3"
+      dataset_uri: "s3://my-bucket/datasets/training.jsonl"
+      output_uri: "s3://my-bucket/models/llama-3.1-8b-finetuned"
+      checkpoint_uri: "s3://my-bucket/checkpoints/job-001"
+      use_instance_role: true
+
+    hyperparameters:
+      sequence_len: 2048
+      micro_batch_size: 2
+      gradient_accumulation_steps: 4
+      num_epochs: 3
+      learning_rate: 0.0002
+      warmup_steps: 100
+      logging_steps: 10
+      eval_steps: 100
+      save_steps: 500
+      load_in_4bit: true
+      lora_r: 32
+      lora_alpha: 64
+      lora_dropout: 0.05
+      lora_target_linear: true
+
+    output_dir: "/workspace/output"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: axolotl-usf-data
+  namespace: axolotl-usf
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: fast-ssd
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: axolotl-usf-output
+  namespace: axolotl-usf
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: fast-ssd
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: axolotl-usf-training
+  namespace: axolotl-usf
+  labels:
+    app: axolotl-usf
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: axolotl-usf
+  template:
+    metadata:
+      labels:
+        app: axolotl-usf
+    spec:
+      # Node selector for GPU nodes
+      nodeSelector:
+        accelerator: nvidia-gpu
+
+      # Toleration for GPU taints
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+
+      containers:
+      - name: trainer
+        image: axolotl-usf:latest
+        imagePullPolicy: Always
+
+        resources:
+          requests:
+            memory: "32Gi"
+            cpu: "8"
+            nvidia.com/gpu: "1"
+          limits:
+            memory: "64Gi"
+            cpu: "16"
+            nvidia.com/gpu: "1"
+
+        env:
+        - name: WORLD_SIZE
+          value: "1"
+        - name: RANK
+          value: "0"
+        - name: LOCAL_RANK
+          value: "0"
+        - name: MASTER_ADDR
+          value: "localhost"
+        - name: MASTER_PORT
+          value: "29500"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: JSON_LOGS
+          value: "true"
+        - name: CUDA_VISIBLE_DEVICES
+          value: "0"
+
+        # AWS credentials from secrets (or use IRSA)
+        - name: AWS_REGION
+          valueFrom:
+            secretKeyRef:
+              name: aws-credentials
+              key: region
+              optional: true
+
+        # Monitoring
+        - name: WANDB_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: monitoring-secrets
+              key: wandb-api-key
+              optional: true
+
+        volumeMounts:
+        - name: config
+          mountPath: /workspace/job_config.yaml
+          subPath: job_config.yaml
+        - name: data
+          mountPath: /workspace/data
+        - name: output
+          mountPath: /workspace/output
+        - name: dshm
+          mountPath: /dev/shm
+
+        # Liveness probe
+        livenessProbe:
+          exec:
+            command: ["/healthcheck.sh"]
+          initialDelaySeconds: 30
+          periodSeconds: 60
+          timeoutSeconds: 10
+          failureThreshold: 3
+
+        # Readiness probe
+        readinessProbe:
+          exec:
+            command: ["/healthcheck.sh"]
+          initialDelaySeconds: 10
+          periodSeconds: 30
+
+      volumes:
+      - name: config
+        configMap:
+          name: axolotl-usf-config
+      - name: data
+        persistentVolumeClaim:
+          claimName: axolotl-usf-data
+      - name: output
+        persistentVolumeClaim:
+          claimName: axolotl-usf-output
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 32Gi
+
+      restartPolicy: Always
+---
+# Optional: Service for monitoring/debugging
+apiVersion: v1
+kind: Service
+metadata:
+  name: axolotl-usf-service
+  namespace: axolotl-usf
+spec:
+  selector:
+    app: axolotl-usf
+  ports:
+  - name: distributed
+    port: 29500
+    targetPort: 29500
+  - name: monitoring
+    port: 8000
+    targetPort: 8000
+  type: ClusterIP

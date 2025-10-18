@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #28a745; color: white; padding: 20px; border-radius: 5px; }
+        .content { background: #f8f9fa; padding: 20px; margin-top: 20px; border-radius: 5px; }
+        .footer { margin-top: 20px; padding: 20px; background: #e9ecef; border-radius: 5px; }
+        .metric { margin: 10px 0; }
+        .label { font-weight: bold; }
+        .link { color: #007bff; text-decoration: none; }
+        .warning { background: #fff3cd; padding: 10px; border-left: 4px solid #ffc107; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✅ Training Completed Successfully</h1>
+        </div>
+
+        <div class="content">
+            <h2>Job Details</h2>
+            <div class="metric"><span class="label">Job ID:</span> {job_id}</div>
+            <div class="metric"><span class="label">Model:</span> {model}</div>
+            <div class="metric"><span class="label">Training Type:</span> {training_type}</div>
+            <div class="metric"><span class="label">Duration:</span> {duration_hours} hours</div>
+            <div class="metric"><span class="label">Total Steps:</span> {total_steps}</div>
+            <div class="metric"><span class="label">Final Loss:</span> {final_loss}</div>
+
+            <h2>Model Location</h2>
+            <div class="metric">
+                <span class="label">Final Model:</span>
+                <a href="{model_uri}" class="link">{model_uri}</a>
+            </div>
+
+            <h2>Checkpoints Preserved</h2>
+            <p>Last {checkpoints_kept} checkpoints saved for future reference:</p>
+            <ul>
+                {checkpoint_list}
+            </ul>
+        </div>
+
+        <div class="footer">
+            <div class="warning">
+                <strong>⚠️ Server Deletion Scheduled</strong><br>
+                This training server will be automatically deleted in <strong>{deletion_delay} minutes</strong>.<br>
+                All checkpoints and the final model have been safely uploaded to cloud storage.
+            </div>
+
+            <p style="margin-top: 15px; font-size: 12px; color: #666;">
+                Training completed at: {completion_time}<br>
+                System: Axolotl Automated Fine-Tuning v2.0
+            </p>
+        </div>
+    </div>
+</body>
+</html>

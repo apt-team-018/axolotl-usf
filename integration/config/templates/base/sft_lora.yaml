@@ -1,0 +1,63 @@
+# LoRA Fine-Tuning Base Configuration
+base_model: ${MODEL_NAME}
+model_type: AutoModelForCausalLM
+
+# LoRA configuration
+adapter: lora
+lora_r: ${LORA_R:16}
+lora_alpha: ${LORA_ALPHA:32}
+lora_dropout: ${LORA_DROPOUT:0.05}
+lora_target_modules: ${LORA_TARGET_MODULES}
+  # Auto-populated based on model architecture
+
+# Dataset configuration
+datasets:
+  - path: ${DATASET_PATH}
+    type: ${DATASET_TYPE:alpaca}
+
+# Training parameters
+sequence_len: ${SEQUENCE_LENGTH:2048}
+sample_packing: true
+pad_to_sequence_len: true
+
+# Optimization (lighter than full fine-tuning)
+optimizer: ${OPTIMIZER:adamw_8bit}
+lr_scheduler: ${LR_SCHEDULER:cosine}
+learning_rate: ${LEARNING_RATE:2e-4}
+
+# Hardware optimization
+bf16: auto
+tf32: true
+flash_attention: true
+gradient_checkpointing: true
+gradient_checkpointing_kwargs:
+  use_reentrant: false
+
+# Batch sizing (can be larger than full fine-tuning)
+micro_batch_size: ${MICRO_BATCH_SIZE:4}
+gradient_accumulation_steps: ${GRAD_ACCUM_STEPS:2}
+
+# Training duration
+num_epochs: ${NUM_EPOCHS:3}
+
+# Evaluation
+val_set_size: ${VAL_SET_SIZE:0.1}
+evals_per_epoch: ${EVALS_PER_EPOCH:4}
+
+# Checkpointing
+output_dir: ${OUTPUT_DIR:./outputs/lora}
+saves_per_epoch: ${SAVES_PER_EPOCH:1}
+save_safetensors: true
+
+# Logging
+logging_steps: ${LOGGING_STEPS:10}
+weight_decay: ${WEIGHT_DECAY:0.0}
+warmup_ratio: ${WARMUP_RATIO:0.1}
+
+# Loss watchdog
+loss_watchdog_threshold: ${LOSS_THRESHOLD:5.0}
+loss_watchdog_patience: ${LOSS_PATIENCE:3}
+
+# Special tokens
+special_tokens:
+  pad_token: ${PAD_TOKEN:<|end_of_text|>}

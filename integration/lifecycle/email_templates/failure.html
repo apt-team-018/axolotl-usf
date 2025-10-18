@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #dc3545; color: white; padding: 20px; border-radius: 5px; }
+        .content { background: #f8f9fa; padding: 20px; margin-top: 20px; border-radius: 5px; }
+        .error-box { background: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; margin: 15px 0; border-radius: 5px; }
+        .info-box { background: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; margin: 15px 0; border-radius: 5px; }
+        .footer { margin-top: 20px; padding: 20px; background: #e9ecef; border-radius: 5px; }
+        .metric { margin: 10px 0; }
+        .label { font-weight: bold; }
+        .link { color: #007bff; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>❌ Training Failed</h1>
+            <p style="margin: 0;">Attempt {attempt} of {max_attempts}</p>
+        </div>
+
+        <div class="content">
+            <h2>Job Details</h2>
+            <div class="metric"><span class="label">Job ID:</span> {job_id}</div>
+            <div class="metric"><span class="label">Model:</span> {model}</div>
+            <div class="metric"><span class="label">Failed at Step:</span> {failed_step} / {total_steps}</div>
+            <div class="metric"><span class="label">Progress:</span> {progress_percent}%</div>
+
+            <div class="error-box">
+                <h3>Error Details</h3>
+                <pre style="white-space: pre-wrap;">{error_message}</pre>
+            </div>
+
+            <h2>Latest Checkpoint</h2>
+            <div class="metric">
+                <span class="label">Checkpoint URI:</span><br>
+                <a href="{checkpoint_uri}" class="link">{checkpoint_uri}</a>
+            </div>
+            <p style="font-size: 14px; color: #666;">
+                This checkpoint has been safely uploaded and can be used to resume training.
+            </p>
+
+            <div class="info-box">
+                <h3>{retry_status_icon} Next Steps</h3>
+                <p><strong>{retry_message}</strong></p>
+                {retry_details}
+            </div>
+        </div>
+
+        <div class="footer">
+            <p style="font-size: 12px; color: #666;">
+                Failed at: {failure_time}<br>
+                System: Axolotl Automated Fine-Tuning v2.0
+            </p>
+        </div>
+    </div>
+</body>
+</html>

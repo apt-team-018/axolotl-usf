@@ -1,0 +1,77 @@
+# Single-GPU LoRA Fine-Tuning Test Configuration
+# Perfect for testing on cloud platforms: RunPod, Vast.ai, Azure, AWS
+# Model: Qwen2.5-0.5B-Instruct (small model for fast testing)
+# Dataset: 100 samples from HuggingFace
+# Training: LoRA with minimal resources
+
+job_id: "single-gpu-lora-test-001"
+
+# Model Configuration
+model: "Qwen/Qwen2.5-0.5B-Instruct"
+training_type: "lora"
+
+# Hardware Setup (Single GPU)
+nodes: 1
+gpus_per_node: 1
+
+# Storage Configuration
+storage:
+  type: "filesystem"  # Use local filesystem for testing
+  dataset_uri: "hf://mlabonne/FineTome-100k"  # HuggingFace dataset
+  output_uri: "/workspace/output"
+  checkpoint_uri: "/workspace/checkpoints"
+
+# Hyperparameters - Optimized for Single H200 GPU
+hyperparameters:
+  # Dataset settings
+  dataset_type: "chat_template"  # Use model's chat template
+
+  # Sequence and batch settings
+  sequence_len: 2048
+  micro_batch_size: 4
+  gradient_accumulation_steps: 4
+  num_epochs: 1  # Single epoch for testing
+
+  # LoRA Configuration
+  adapter: "lora"
+  lora_r: 32
+  lora_alpha: 64
+  lora_dropout: 0.05
+  lora_target_linear: true
+  lora_fan_in_fan_out: false
+
+  # Optimizer
+  optimizer: "adamw_torch"
+  learning_rate: 0.0002
+  lr_scheduler: "cosine"
+  warmup_steps: 100
+
+  # Training Settings
+  max_steps: 500  # Stop after 500 steps (for testing)
+  save_steps: 250
+  eval_steps: 100
+  logging_steps: 10
+
+  # Memory Optimization
+  gradient_checkpointing: true
+  flash_attention: true
+  bf16: true
+  tf32: true
+
+  # Saving
+  save_safetensors: true
+
+  # Evaluation
+  val_set_size: 0.05  # 5% validation split
+  eval_table_size: 5  # Show 5 examples during eval
+
+# Output Directory
+output_dir: "/workspace/output"
+
+# Optional: Monitoring (comment out if not needed)
+# monitoring:
+#   wandb:
+#     project: "qwen-lora-test"
+#     run_name: "single-gpu-test"
+#   tensorboard:
+#     log_dir: "/workspace/logs"

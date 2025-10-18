@@ -1,0 +1,45 @@
+# Integration Layer Requirements
+# Production-ready automated fine-tuning system
+
+# Core dependencies (should already be installed with Axolotl)
+torch>=2.1.0
+transformers>=4.36.0
+accelerate>=0.25.0
+peft>=0.7.0
+datasets>=2.14.0
+
+# Configuration and validation
+pyyaml>=6.0
+pydantic>=2.0.0,<3.0.0
+
+# Retry logic
+tenacity>=8.2.0
+
+# Storage backends
+boto3>=1.28.0              # AWS S3
+azure-storage-blob>=12.19.0  # Azure Blob Storage
+google-cloud-storage>=2.10.0  # Google Cloud Storage
+huggingface_hub>=0.19.0    # HuggingFace Hub
+
+# Monitoring backends
+pymongo>=4.5.0             # MongoDB
+wandb>=0.16.0              # Weights & Biases
+mlflow>=2.9.0              # MLflow
+tensorboard>=2.15.0        # TensorBoard
+
+# Optional but recommended
+# Deep learning optimizations (included in Axolotl)
+# deepspeed>=0.12.0
+# flash-attn>=2.3.0
+# bitsandbytes>=0.41.0
+
+# Development and testing (optional)
+pytest>=7.4.0
+pytest-cov>=4.1.0
+black>=23.0.0
+flake8>=6.1.0
+mypy>=1.7.0
+
+# API (if using the optional API server)
+# fastapi>=0.104.0
+# uvicorn[standard]>=0.24.0

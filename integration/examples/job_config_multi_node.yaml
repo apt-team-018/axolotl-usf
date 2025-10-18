@@ -1,0 +1,47 @@
+# Example Job Configuration - Multi-Node 70B QLoRA Training
+job_id: "llama3-70b-multinode-qlora"
+
+# Model configuration
+model: "meta-llama/Llama-3.1-70B"
+training_type: "qlora"
+
+# Hardware configuration
+nodes: 8
+gpus_per_node: 8
+
+# Dataset configuration
+dataset_type: "alpaca"
+
+# Storage configuration
+storage:
+  type: "azure"
+  credentials:
+    account_name: "${AZURE_STORAGE_ACCOUNT}"
+    account_key: "${AZURE_STORAGE_KEY}"
+  dataset_uri: "azure://training-data/datasets/custom_data.jsonl"
+  output_uri: "azure://models/llama3-70b-qlora"
+
+# Monitoring configuration
+monitoring:
+  mlflow:
+    tracking_uri: "https://mlflow.example.com"
+    experiment_name: "llama3-70b-finetuning"
+  mongodb:
+    uri: "mongodb://mongo.example.com:27017"
+    database: "training"
+    collection: "metrics"
+
+# Training hyperparameters
+hyperparameters:
+  batch_size: 128
+  micro_batch_size: 1
+  gradient_accumulation_steps: 16
+  learning_rate: 1e-4
+  num_epochs: 2
+  sequence_length: 4096
+  lora_r: 64
+  lora_alpha: 128
+  lora_dropout: 0.05
+  fsdp_offload: true
+
+output_dir: "/workspace/output"

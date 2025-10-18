@@ -1,0 +1,51 @@
+# Full Fine-Tuning Base Configuration
+base_model: ${MODEL_NAME}
+model_type: AutoModelForCausalLM
+
+# Dataset configuration
+datasets:
+  - path: ${DATASET_PATH}
+    type: ${DATASET_TYPE:alpaca}
+
+# Training parameters
+sequence_len: ${SEQUENCE_LENGTH:4096}
+sample_packing: true
+pad_to_sequence_len: true
+
+# Optimization
+optimizer: ${OPTIMIZER:paged_adamw_8bit}
+lr_scheduler: ${LR_SCHEDULER:cosine}
+learning_rate: ${LEARNING_RATE:2e-5}
+
+# Hardware optimization
+bf16: auto
+tf32: true
+flash_attention: true
+gradient_checkpointing: true
+gradient_checkpointing_kwargs:
+  use_reentrant: false
+
+# Batch sizing
+micro_batch_size: ${MICRO_BATCH_SIZE:2}
+gradient_accumulation_steps: ${GRAD_ACCUM_STEPS:4}
+
+# Training duration
+num_epochs: ${NUM_EPOCHS:3}
+
+# Evaluation
+val_set_size: ${VAL_SET_SIZE:0.05}
+evals_per_epoch: ${EVALS_PER_EPOCH:2}
+
+# Checkpointing
+output_dir: ${OUTPUT_DIR:./outputs}
+saves_per_epoch: ${SAVES_PER_EPOCH:1}
+save_safetensors: true
+
+# Logging
+logging_steps: ${LOGGING_STEPS:10}
+weight_decay: ${WEIGHT_DECAY:0.0}
+warmup_ratio: ${WARMUP_RATIO:0.1}
+
+# Special tokens
+special_tokens:
+  pad_token: ${PAD_TOKEN:<|end_of_text|>}

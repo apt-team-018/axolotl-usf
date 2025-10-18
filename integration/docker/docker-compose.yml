@@ -1,0 +1,137 @@
+# Docker Compose for Single-Node Training
+# Usage:
+#   docker-compose -f integration/docker/docker-compose.yml up
+
+version: '3.8'
+
+services:
+  axolotl-trainer:
+    image: axolotl-usf:latest
+    container_name: axolotl-usf-trainer
+
+    # GPU support
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    # Environment variables
+    environment:
+      # Distributed training (single node)
+      - WORLD_SIZE=1
+      - RANK=0
+      - LOCAL_RANK=0
+      - NODE_RANK=0
+      - MASTER_ADDR=localhost
+      - MASTER_PORT=29500
+
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - JSON_LOGS=${JSON_LOGS:-false}
+
+      # CUDA settings
+      - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-all}
+      - NCCL_DEBUG=${NCCL_DEBUG:-WARN}
+
+      # Monitoring (optional - set in .env file)
+      - WANDB_API_KEY=${WANDB_API_KEY:-}
+      - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI:-}
+      - MONGODB_URI=${MONGODB_URI:-}
+
+      # Cloud storage (optional)
+      - AWS_REGION=${AWS_REGION:-}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AZURE_STORAGE_ACCOUNT=${AZURE_STORAGE_ACCOUNT:-}
+      - AZURE_STORAGE_KEY=${AZURE_STORAGE_KEY:-}
+      - GCS_PROJECT_ID=${GCS_PROJECT_ID:-}
+
+    # Volume mounts
+    volumes:
+      # Job configuration
+      - ./job_config.yaml:/workspace/job_config.yaml:ro
+
+      # Data directory (for datasets)
+      - ${DATA_DIR:-./data}:/workspace/data
+
+      # Output directory (for trained models)
+      - ${OUTPUT_DIR:-./output}:/workspace/output
+
+      # Checkpoints directory
+      - ${CHECKPOINT_DIR:-./checkpoints}:/workspace/checkpoints
+
+      # Logs directory
+      - ${LOGS_DIR:-./logs}:/workspace/logs
+
+      # Optional: Mount custom integration code for development
+      # - ../:/workspace/integration:ro
+
+      # Optional: HuggingFace cache
+      - ${HF_HOME:-~/.cache/huggingface}:/root/.cache/huggingface
+
+    # Networking
+    ports:
+      - "29500:29500"  # PyTorch distributed
+      - "8000:8000"    # Optional monitoring API
+
+    # Resource limits (optional)
+    # mem_limit: 64g
+    # memswap_limit: 64g
+    # shm_size: '32gb'  # Increase shared memory for data loaders
+
+    # Healthcheck
+    healthcheck:
+      test: ["/healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+# Optional: MongoDB for metrics storage
+  mongodb:
+    image: mongo:7.0
+    container_name: axolotl-usf-mongodb
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USERNAME:-admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD:-changeme}
+    volumes:
+      - mongodb_data:/data/db
+    ports:
+      - "27017:27017"
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+# Optional: MLflow for experiment tracking
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.10.2
+    container_name: axolotl-usf-mlflow
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlflow.db --default-artifact-root /mlflow/artifacts
+    volumes:
+      - mlflow_data:/mlflow
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+volumes:
+  mongodb_data:
+  mlflow_data:
+
+networks:
+  default:
+    name: axolotl-usf-network

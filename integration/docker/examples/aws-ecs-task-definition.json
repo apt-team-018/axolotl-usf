@@ -1,0 +1,156 @@
+{
+  "family": "axolotl-usf-training",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/AxolotlUSFTaskRole",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/AxolotlUSFExecutionRole",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["EC2"],
+  "cpu": "16384",
+  "memory": "65536",
+  "containerDefinitions": [
+    {
+      "name": "axolotl-usf-trainer",
+      "image": "ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/axolotl-usf:latest",
+      "essential": true,
+      "resourceRequirements": [
+        {
+          "type": "GPU",
+          "value": "1"
+        }
+      ],
+      "environment": [
+        {
+          "name": "WORLD_SIZE",
+          "value": "1"
+        },
+        {
+          "name": "RANK",
+          "value": "0"
+        },
+        {
+          "name": "LOCAL_RANK",
+          "value": "0"
+        },
+        {
+          "name": "MASTER_ADDR",
+          "value": "localhost"
+        },
+        {
+          "name": "MASTER_PORT",
+          "value": "29500"
+        },
+        {
+          "name": "LOG_LEVEL",
+          "value": "INFO"
+        },
+        {
+          "name": "JSON_LOGS",
+          "value": "true"
+        },
+        {
+          "name": "AWS_REGION",
+          "value": "us-east-1"
+        },
+        {
+          "name": "CUDA_VISIBLE_DEVICES",
+          "value": "0"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "WANDB_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:axolotl-usf/wandb-api-key"
+        },
+        {
+          "name": "MONGODB_URI",
+          "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:axolotl-usf/mongodb-uri"
+        }
+      ],
+      "mountPoints": [
+        {
+          "sourceVolume": "job-config",
+          "containerPath": "/workspace/job_config.yaml",
+          "readOnly": true
+        },
+        {
+          "sourceVolume": "efs-data",
+          "containerPath": "/workspace/data"
+        },
+        {
+          "sourceVolume": "efs-output",
+          "containerPath": "/workspace/output"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/axolotl-usf",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "training"
+        }
+      },
+      "healthCheck": {
+        "command": ["/healthcheck.sh"],
+        "interval": 30,
+        "timeout": 10,
+        "retries": 3,
+        "startPeriod": 30
+      },
+      "linuxParameters": {
+        "sharedMemorySize": 32768,
+        "devices": [
+          {
+            "hostPath": "/dev/infiniband/uverbs0",
+            "containerPath": "/dev/infiniband/uverbs0",
+            "permissions": ["read", "write"]
+          }
+        ]
+      }
+    }
+  ],
+  "volumes": [
+    {
+      "name": "job-config",
+      "host": {
+        "sourcePath": "/opt/axolotl/job_config.yaml"
+      }
+    },
+    {
+      "name": "efs-data",
+      "efsVolumeConfiguration": {
+        "fileSystemId": "fs-XXXXXXXXX",
+        "rootDirectory": "/data",
+        "transitEncryption": "ENABLED",
+        "authorizationConfig": {
+          "iam": "ENABLED"
+        }
+      }
+    },
+    {
+      "name": "efs-output",
+      "efsVolumeConfiguration": {
+        "fileSystemId": "fs-XXXXXXXXX",
+        "rootDirectory": "/output",
+        "transitEncryption": "ENABLED",
+        "authorizationConfig": {
+          "iam": "ENABLED"
+        }
+      }
+    }
+  ],
+  "placementConstraints": [
+    {
+      "type": "memberOf",
+      "expression": "attribute:ecs.instance-type =~ g5.*"
+    }
+  ],
+  "tags": [
+    {
+      "key": "Project",
+      "value": "AxolotlUSF"
+    },
+    {
+      "key": "Environment",
+      "value": "production"
+    }
+  ]
+}

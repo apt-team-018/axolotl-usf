@@ -1,0 +1,23 @@
+# Multi-Node FSDP Configuration
+# For ${NUM_NODES} nodes with ${GPUS_PER_NODE} GPUs each
+
+# FSDP Configuration
+fsdp: true
+fsdp_config:
+  fsdp_auto_wrap_policy: TRANSFORMER_BASED_WRAP
+  fsdp_transformer_layer_cls_to_wrap: ${TRANSFORMER_LAYER_CLASS}
+  fsdp_state_dict_type: FULL_STATE_DICT
+  fsdp_offload_params: ${FSDP_OFFLOAD:false}
+  fsdp_sync_module_states: true
+  fsdp_cpu_ram_efficient_loading: true
+
+# Distributed settings
+world_size: ${WORLD_SIZE}
+ddp: true
+
+# ND Parallelism (optional, for very large models 70B+)
+# Uncomment and configure if needed:
+# dp_shard_size: ${DP_SHARD_SIZE:4}
+# tensor_parallel_size: ${TP_SIZE:2}
+# context_parallel_size: ${CP_SIZE:2}
+# dp_replicate_size: ${DP_REPLICATE:2}

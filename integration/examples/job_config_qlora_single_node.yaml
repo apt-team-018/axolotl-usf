@@ -1,0 +1,48 @@
+# Example Job Configuration - Single Node QLoRA Training
+job_id: "llama3-8b-qlora-example"
+
+# Model configuration
+model: "meta-llama/Llama-3.1-8B"
+training_type: "qlora"  # Options: full, lora, qlora
+
+# Hardware configuration
+nodes: 1
+gpus_per_node: 4
+
+# Dataset configuration
+dataset_type: "alpaca"
+
+# Storage configuration
+storage:
+  type: "s3"  # Options: s3, azure, gcs, filesystem, hf
+  credentials:
+    aws_access_key_id: "${AWS_ACCESS_KEY_ID}"
+    aws_secret_access_key: "${AWS_SECRET_ACCESS_KEY}"
+    region: "us-east-1"
+  dataset_uri: "s3://my-bucket/datasets/alpaca.jsonl"
+  output_uri: "s3://my-bucket/models/llama3-8b-qlora"
+
+# Monitoring configuration
+monitoring:
+  wandb:
+    project: "llama3-finetuning"
+    entity: "my-team"
+  mongodb:
+    uri: "mongodb://localhost:27017"
+    database: "training"
+    collection: "metrics"
+
+# Training hyperparameters
+hyperparameters:
+  batch_size: 64
+  micro_batch_size: 2
+  gradient_accumulation_steps: 8
+  learning_rate: 2e-4
+  num_epochs: 3
+  sequence_length: 2048
+  lora_r: 32
+  lora_alpha: 64
+  lora_dropout: 0.05
+
+# Output configuration
+output_dir: "/workspace/output"

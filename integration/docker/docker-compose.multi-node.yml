@@ -1,0 +1,169 @@
+# Docker Compose for Multi-Node Distributed Training
+# Usage:
+#   # On master node (node 0):
+#   MASTER_ADDR=<master-ip> docker-compose -f integration/docker/docker-compose.multi-node.yml up master
+#
+#   # On worker nodes (node 1, 2, etc.):
+#   MASTER_ADDR=<master-ip> NODE_RANK=1 docker-compose -f integration/docker/docker-compose.multi-node.yml up worker
+
+version: '3.8'
+
+x-common-settings: &common-settings
+  image: axolotl-usf:latest
+
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+
+  environment: &common-env
+    # Distributed training settings
+    - WORLD_SIZE=${WORLD_SIZE:-4}
+    - GPUS_PER_NODE=${GPUS_PER_NODE:-2}
+    - MASTER_ADDR=${MASTER_ADDR:-master}
+    - MASTER_PORT=${MASTER_PORT:-29500}
+    - NCCL_SOCKET_IFNAME=${NCCL_SOCKET_IFNAME:-eth0}
+    - NCCL_IB_DISABLE=${NCCL_IB_DISABLE:-0}
+
+    # Logging
+    - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    - JSON_LOGS=${JSON_LOGS:-true}
+
+    # CUDA/NCCL debugging (set to INFO for troubleshooting)
+    - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-all}
+    - NCCL_DEBUG=${NCCL_DEBUG:-WARN}
+    - TORCH_DISTRIBUTED_DEBUG=${TORCH_DISTRIBUTED_DEBUG:-OFF}
+
+    # Monitoring
+    - WANDB_API_KEY=${WANDB_API_KEY:-}
+    - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI:-}
+    - MONGODB_URI=${MONGODB_URI:-}
+
+    # Cloud storage
+    - AWS_REGION=${AWS_REGION:-}
+    - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+    - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+
+  volumes: &common-volumes
+    - ./job_config.yaml:/workspace/job_config.yaml:ro
+    - ${DATA_DIR:-./data}:/workspace/data
+    - ${OUTPUT_DIR:-./output}:/workspace/output
+    - ${CHECKPOINT_DIR:-./checkpoints}:/workspace/checkpoints
+    - ${LOGS_DIR:-./logs}:/workspace/logs
+    - ${HF_HOME:-~/.cache/huggingface}:/root/.cache/huggingface
+
+  networks:
+    - axolotl-distributed
+
+  restart: unless-stopped
+
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "100m"
+      max-file: "5"
+
+services:
+  # Master node (rank 0)
+  master:
+    <<: *common-settings
+    container_name: axolotl-usf-master
+    hostname: master
+
+    environment:
+      - WORLD_SIZE=${WORLD_SIZE:-4}
+      - GPUS_PER_NODE=${GPUS_PER_NODE:-2}
+      - MASTER_ADDR=${MASTER_ADDR:-master}
+      - MASTER_PORT=${MASTER_PORT:-29500}
+      - NCCL_SOCKET_IFNAME=${NCCL_SOCKET_IFNAME:-eth0}
+      - NCCL_IB_DISABLE=${NCCL_IB_DISABLE:-0}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - JSON_LOGS=${JSON_LOGS:-true}
+      - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-all}
+      - NCCL_DEBUG=${NCCL_DEBUG:-WARN}
+      - TORCH_DISTRIBUTED_DEBUG=${TORCH_DISTRIBUTED_DEBUG:-OFF}
+      - WANDB_API_KEY=${WANDB_API_KEY:-}
+      - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI:-}
+      - MONGODB_URI=${MONGODB_URI:-}
+      - AWS_REGION=${AWS_REGION:-}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - RANK=0
+      - LOCAL_RANK=0
+      - NODE_RANK=0
+
+    ports:
+      - "29500:29500"  # Distributed training port
+      - "8000:8000"    # Monitoring API
+
+    healthcheck:
+      test: ["/healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # Worker nodes (ranks 1, 2, 3, ...)
+  worker:
+    <<: *common-settings
+
+    environment:
+      - WORLD_SIZE=${WORLD_SIZE:-4}
+      - GPUS_PER_NODE=${GPUS_PER_NODE:-2}
+      - MASTER_ADDR=${MASTER_ADDR:-master}
+      - MASTER_PORT=${MASTER_PORT:-29500}
+      - NCCL_SOCKET_IFNAME=${NCCL_SOCKET_IFNAME:-eth0}
+      - NCCL_IB_DISABLE=${NCCL_IB_DISABLE:-0}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - JSON_LOGS=${JSON_LOGS:-true}
+      - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-all}
+      - NCCL_DEBUG=${NCCL_DEBUG:-WARN}
+      - TORCH_DISTRIBUTED_DEBUG=${TORCH_DISTRIBUTED_DEBUG:-OFF}
+      - WANDB_API_KEY=${WANDB_API_KEY:-}
+      - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI:-}
+      - MONGODB_URI=${MONGODB_URI:-}
+      - AWS_REGION=${AWS_REGION:-}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - NODE_RANK=${NODE_RANK:-1}
+      - RANK=${NODE_RANK:-1}
+      - LOCAL_RANK=0
+
+    # Scale workers as needed
+    # Use: docker-compose up --scale worker=3
+
+    healthcheck:
+      test: ["/healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+    depends_on:
+      - master
+
+networks:
+  axolotl-distributed:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+# Example usage for 2-node setup (4 GPUs total, 2 per node):
+#
+# Terminal 1 (Master - Node 0):
+# WORLD_SIZE=4 GPUS_PER_NODE=2 MASTER_ADDR=172.28.0.2 \
+#   docker-compose -f docker-compose.multi-node.yml up master
+#
+# Terminal 2 (Worker - Node 1):
+# WORLD_SIZE=4 GPUS_PER_NODE=2 MASTER_ADDR=172.28.0.2 NODE_RANK=1 \
+#   docker-compose -f docker-compose.multi-node.yml up worker
+#
+# For cloud deployments across multiple machines:
+# - Set MASTER_ADDR to actual IP of master node
+# - Ensure ports 29500 and networking is accessible between nodes
+# - Use same WORLD_SIZE on all nodes
+# - Set unique NODE_RANK for each worker node
