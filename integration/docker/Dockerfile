@@ -32,7 +32,7 @@ ENV TORCH_CUDA_ARCH_LIST=$TORCH_CUDA_ARCH_LIST
 
 # Install system dependencies (following Axolotl's docker/Dockerfile-base pattern)
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends --allow-change-held-packages \
         wget git build-essential ninja-build git-lfs libaio-dev pkg-config \
         ibverbs-providers ibverbs-utils infiniband-diags \
         librdmacm-dev librdmacm1 rdmacm-utils \
