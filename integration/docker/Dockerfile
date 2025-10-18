@@ -5,7 +5,8 @@
 #   docker build -f integration/docker/Dockerfile -t axolotl-usf:latest .
 #   docker run --gpus all -v $(pwd)/job_config.yaml:/workspace/job_config.yaml axolotl-usf:latest
 
-ARG CUDA_VERSION="12.4.1"
+# Use Axolotl's exact proven CUDA version from docker/Dockerfile-base
+ARG CUDA_VERSION="11.8.0"
 ARG CUDNN_VERSION="8"
 ARG UBUNTU_VERSION="22.04"
 
@@ -20,10 +21,10 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV PATH="/root/miniconda3/bin:${PATH}"
 
-# Build arguments (following Axolotl's pattern)
+# Build arguments (matching Axolotl's docker/Dockerfile-base exactly)
 ARG PYTHON_VERSION="3.11"
-ARG PYTORCH_VERSION="2.4.0"
-ARG CUDA="124"
+ARG PYTORCH_VERSION="2.1.2"
+ARG CUDA="118"
 ARG TORCH_CUDA_ARCH_LIST="7.0 7.5 8.0 8.6 9.0+PTX"
 
 ENV PYTHON_VERSION=$PYTHON_VERSION
