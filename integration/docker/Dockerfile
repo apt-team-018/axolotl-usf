@@ -45,6 +45,8 @@ RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh \
     && mkdir /root/.conda \
     && bash Miniconda3-latest-Linux-x86_64.sh -b \
     && rm -f Miniconda3-latest-Linux-x86_64.sh \
+    && conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main \
+    && conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r \
     && conda create -n "py${PYTHON_VERSION}" python="${PYTHON_VERSION}"
 
 # Activate conda environment
@@ -52,22 +54,22 @@ ENV PATH="/root/miniconda3/envs/py${PYTHON_VERSION}/bin:${PATH}"
 
 WORKDIR /workspace
 
-# Install PyTorch with CUDA 12.4 support (following Axolotl's pattern)
+# Install PyTorch and dependencies (EXACTLY like Axolotl's docker/Dockerfile-base)
 RUN python3 -m pip install --upgrade pip && \
-    pip3 install -U packaging setuptools wheel && \
-    python3 -m pip install --no-cache-dir -U \
-        torch==${PYTORCH_VERSION} \
-        torchvision \
-        torchaudio \
-        --extra-index-url https://download.pytorch.org/whl/cu${CUDA}
+    pip3 install -U packaging==23.2 setuptools==75.8.0 wheel && \
+    python3 -m pip install --no-cache-dir -U torch==${PYTORCH_VERSION}+cu${CUDA} torchvision --extra-index-url https://download.pytorch.org/whl/cu$CUDA && \
+    CAUSAL_CONV1D_FORCE_CXX11_ABI=TRUE CAUSAL_CONV1D_FORCE_BUILD=TRUE python3 -m pip install --no-cache-dir causal_conv1d==1.5.2 && \
+    python3 -m pip install --no-cache-dir "mamba_ssm @ git+https://github.com/state-spaces/mamba.git@main" && \
+    python3 -m pip cache purge
 
-# Install Flash Attention (no-build-isolation like Axolotl)
-RUN pip3 install --no-build-isolation flash-attn==2.6.3
-
-# Install git-lfs and awscli (like Axolotl base)
+# Install git-lfs, awscli, and pydantic (EXACTLY like Axolotl's docker/Dockerfile-base)
 RUN git lfs install --skip-repo && \
     pip3 install awscli && \
-    pip3 install -U --no-cache-dir pydantic
+    pip3 install -U --no-cache-dir pydantic==1.10.10 && \
+    pip3 cache purge
+
+# Install Flash Attention (conditional, like Axolotl)
+RUN pip3 install --no-build-isolation flash-attn==2.6.3
 
 # Copy Axolotl source code from repository
 COPY . /workspace/axolotl-usf
