@@ -5,8 +5,8 @@
 #   docker build -f integration/docker/Dockerfile -t axolotl-usf:latest .
 #   docker run --gpus all -v $(pwd)/job_config.yaml:/workspace/job_config.yaml axolotl-usf:latest
 
-# Use CUDA 12.8.1 (matches Axolotl's docker/Dockerfile-base-next for Python 3.11)
-ARG CUDA_VERSION="12.8.1"
+# Use CUDA 11.8.0 (verified to exist and work from Axolotl's docker/Dockerfile-base)
+ARG CUDA_VERSION="11.8.0"
 ARG CUDNN_VERSION="8"
 ARG UBUNTU_VERSION="22.04"
 
@@ -21,10 +21,10 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV PATH="/root/miniconda3/bin:${PATH}"
 
-# Build arguments (matching Axolotl's docker/Dockerfile-base-next for Python 3.11)
+# Build arguments (Python 3.11 with CUDA 11.8 - using stable PyTorch)
 ARG PYTHON_VERSION="3.11"
-ARG PYTORCH_VERSION="2.7.1"
-ARG CUDA="128"
+ARG PYTORCH_VERSION="2.3.0"
+ARG CUDA="118"
 ARG TORCH_CUDA_ARCH_LIST="7.0 7.5 8.0 8.6 9.0+PTX"
 
 ENV PYTHON_VERSION=$PYTHON_VERSION
@@ -45,19 +45,19 @@ ENV PATH="/root/miniconda3/envs/py${PYTHON_VERSION}/bin:${PATH}"
 
 WORKDIR /workspace
 
-# Install PyTorch and dependencies (EXACTLY like Axolotl's Dockerfile-base-next)
-RUN python3 -m pip install --upgrade pip && pip3 install packaging && \
-    python3 -m pip install --no-cache-dir -U torch==${PYTORCH_VERSION} --extra-index-url https://download.pytorch.org/whl/test/cu$CUDA && \
+# Install PyTorch and dependencies (Python 3.11 + CUDA 11.8)
+RUN python3 -m pip install --upgrade pip && pip3 install packaging setuptools wheel && \
+    python3 -m pip install --no-cache-dir -U torch==${PYTORCH_VERSION}+cu${CUDA} torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu$CUDA && \
     python3 -m pip install --no-cache-dir "causal_conv1d @ git+https://github.com/Dao-AILab/causal-conv1d.git@main" && \
     python3 -m pip install --no-cache-dir "mamba_ssm @ git+https://github.com/state-spaces/mamba.git@main"
 
-# Install git-lfs, awscli, and pydantic (EXACTLY like Axolotl's Dockerfile-base-next)
+# Install git-lfs, awscli, and pydantic
 RUN git lfs install --skip-repo && \
     pip3 install awscli && \
-    pip3 install -U --no-cache-dir pydantic==2.10.6
+    pip3 install -U --no-cache-dir pydantic
 
-# Install Flash Attention for CUDA 12.8
-RUN pip3 install --no-build-isolation flash-attn
+# Install Flash Attention for CUDA 12.1
+RUN pip3 install --no-build-isolation flash-attn==2.6.3
 
 # Copy Axolotl source code from repository
 COPY . /workspace/axolotl-usf
