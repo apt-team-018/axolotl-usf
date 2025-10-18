@@ -1,12 +1,15 @@
 # Production Docker Image for Axolotl Integration Layer
-# Builds on top of official Axolotl image with minimal additions
+# Builds Axolotl from source and adds integration layer
 #
 # Usage:
 #   docker build -f integration/docker/Dockerfile -t axolotl-usf:latest .
 #   docker run --gpus all -v $(pwd)/job_config.yaml:/workspace/job_config.yaml axolotl-usf:latest
 
-ARG AXOLOTL_VERSION=main
-FROM axolotlai/axolotl:${AXOLOTL_VERSION}
+ARG CUDA_VERSION=12.4.0
+ARG CUDNN_VERSION=9
+ARG UBUNTU_VERSION=22.04
+
+FROM nvidia/cuda:${CUDA_VERSION}-cudnn${CUDNN_VERSION}-devel-ubuntu${UBUNTU_VERSION}
 
 LABEL maintainer="Axolotl USF Team"
 LABEL description="Production-ready automated fine-tuning with Axolotl"
@@ -15,10 +18,46 @@ LABEL version="1.0.0"
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV DEBIAN_FRONTEND=noninteractive
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH="/root/miniconda3/bin:${PATH}"
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    python3.11 python3.11-dev python3-pip python3.11-venv \
+    git wget curl vim nano \
+    build-essential ninja-build \
+    libaio-dev pkg-config \
+    infiniband-diags ibverbs-providers ibverbs-utils \
+    librdmacm-dev librdmacm1 rdmacm-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Python 3.11 as default
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
+    update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
+
+# Upgrade pip
+RUN python3 -m pip install --upgrade pip setuptools wheel
+
+# Install PyTorch with CUDA support
+RUN pip3 install --no-cache-dir \
+    torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 \
+    --index-url https://download.pytorch.org/whl/cu124
+
+# Install Flash Attention
+RUN pip3 install --no-cache-dir flash-attn==2.6.3 --no-build-isolation
+
+# Set working directory
+WORKDIR /workspace
+
+# Copy Axolotl source code from current repository
+COPY . /workspace/axolotl-usf
+
+# Install Axolotl from source
+WORKDIR /workspace/axolotl-usf
+RUN pip3 install --no-cache-dir -e .[deepspeed,flash-attn,optimizers]
 
 # Install integration layer dependencies
-# Keep this layer minimal to optimize caching
-RUN pip install --no-cache-dir \
+RUN pip3 install --no-cache-dir \
     # Cloud storage clients
     boto3==1.34.52 \
     azure-storage-blob==12.19.0 \
@@ -44,8 +83,8 @@ RUN mkdir -p \
     /workspace/checkpoints \
     /workspace/logs
 
-# Copy integration layer code
-COPY integration/ /workspace/integration/
+# Integration layer is already copied as part of the repo
+# No need to copy again
 
 # Copy Docker-specific scripts
 COPY integration/docker/entrypoint.sh /entrypoint.sh
